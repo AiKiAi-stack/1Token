@@ -183,10 +183,12 @@ export default function DashboardPage() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold">1Token</h1>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => router.push('/dashboard/audit')}>
+              Audit Log
+            </Button>
             <Button variant="outline" onClick={handleLogout}>
               Lock Vault
             </Button>
-          </div>
         </div>
       </header>
 

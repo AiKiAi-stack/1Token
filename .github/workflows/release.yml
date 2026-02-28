@@ -149,8 +149,8 @@ jobs:
           sudo apt-get install -y build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev wget
           
       - name: Build executable with pkg
+        shell: bash
         run: |
-          # Create a simple JavaScript entry point
           echo 'const { spawn } = require("child_process");
           const path = require("path");
           const cliPath = path.resolve(__dirname, "dist", "index.js");
@@ -161,15 +161,14 @@ jobs:
             process.exit(code);
           });' > cli-entry.js
           
-          # Use pkg to create standalone executable
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            # Windows PowerShell - no line continuation
+          if [ "$RUNNER_OS" = "Windows" ]; then
             pkg cli-entry.js --targets node18-windows-x64 --output dist/1token.exe
-          elif [[ "$RUNNER_OS" == "macOS" ]] && [[ "${{ matrix.arch }}" == "arm64" ]]; then
+          elif [ "$RUNNER_OS" = "macOS" ] && [ "${{ matrix.arch }}" = "arm64" ]; then
             pkg cli-entry.js --targets node18-macos-arm64 --output dist/1token
+          elif [ "$RUNNER_OS" = "Linux" ]; then
+            pkg cli-entry.js --targets node18-linux-x64 --output dist/1token
           else
-            # Linux or macOS Intel
-            pkg cli-entry.js --targets node18-${{ matrix.platform }}-${{ matrix.arch }} --output dist/${{ matrix.output_name }}
+            pkg cli-entry.js --targets node18-macos-x64 --output dist/1token
           fi
 
       - name: Create archive

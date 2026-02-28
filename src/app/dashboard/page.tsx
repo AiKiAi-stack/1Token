@@ -9,7 +9,7 @@ import { TokenView } from '@/components/token/token-view'
 import { decrypt } from '@/lib/crypto'
 import { ExportDialog } from '@/components/layout/export-dialog'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
-import { getExpiryStatus } from '@/lib/expiry'
+
 interface Token {
   id: string
   platform: string
@@ -196,6 +196,7 @@ export default function DashboardPage() {
             <Button variant="outline" onClick={handleLogout}>
               Lock Vault
             </Button>
+          </div>
         </div>
       </header>
 
@@ -254,7 +255,7 @@ export default function DashboardPage() {
 
         {showExport && (
           <ExportDialog
-            tags={[...new Set(tokens.flatMap(t => t.tags.split(',').map(t => t.trim()).filter(Boolean))]}
+            tags={[...new Set(tokens.flatMap(t => t.tags.split(',').map(t => t.trim()).filter(Boolean)))]}
             onClose={() => setShowExport(false)}
           />
         )}

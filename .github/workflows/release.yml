@@ -135,6 +135,9 @@ jobs:
           
       - name: Install dependencies
         run: |
+          pnpm install --no-frozen-lockfile
+          pnpm db:generate
+        run: |
           pnpm install --frozen-lockfile
           pnpm db:generate
           pnpm cli:build

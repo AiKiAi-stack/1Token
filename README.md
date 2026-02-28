@@ -1,6 +1,7 @@
-# 1Token - API Token 保险库
+<div align="center">
 
-<!-- 徽章区域 -->
+# 1Token
+
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Version](https://img.shields.io/badge/version-0.1.0-orange)
@@ -8,27 +9,217 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
 ![Prisma](https://img.shields.io/badge/Prisma-6.19-blue?logo=prisma)
 
-> 一句话简介：为开发者提供一个安全、便捷的本地 API Token 管理工具，解决「Token 分散、易过期、难管理」的痛点。
->
-> One-liner: A secure, local-first API Token manager for developers, solving the pain of scattered, expiring, and hard-to-manage tokens.
+> A secure, local-first API Token manager for developers.
+> 
+> 一个安全、本地的 API Token 管理工具，专为开发者打造。
 
-## 📖 目录 / Table of Contents
+**[English](#-features)** | **[中文](#-功能特性)**
 
-- [功能特性 / Features](#-功能特性--features)
-- [技术栈 / Tech Stack](#-技术栈--tech-stack)
-- [快速开始 / Quick Start](#-快速开始--quick-start)
-- [CLI 使用指南](#-cli-使用指南)
-- [安全架构](#-安全架构)
-- [项目结构](#-项目结构)
-- [开发路线图](#-开发路线图)
-- [贡献指南](#-贡献指南)
-- [许可证 / License](#-许可证--license)
+</div>
 
-## ✨ 功能特性 / Features
+---
 
-### 核心功能 / Core Features
+## 🌟 Features
 
-- 🔐 **端到端加密**：采用 AES-256-GCM 加密算法，Token 在数据库中始终以密文存储
+- 🔐 **End-to-End Encryption**: AES-256-GCM encryption, tokens always stored encrypted in database
+- 🎯 **Master Password**: bcrypt hashing + salt, password never stored in database
+- 📋 **One-Click Copy**: Tokens hidden by default, decrypt on click or copy
+- 🏷️ **Tag System**: Support for Prod, Test, CI/CD tags for quick filtering
+- 🔍 **Real-time Search**: Fuzzy search by platform, purpose, or tags
+- ⏰ **Expiration Alerts**: Automatic email reminders 7 days before token expiration
+- 🌙 **Dark Mode**: Full light/dark theme support with auto-detection
+- 💾 **Local Storage**: SQLite database, lightweight and easy to backup
+- 💻 **CLI Tool**: `1token get <platform>` to quickly retrieve and copy tokens
+
+## 🛠 Tech Stack
+
+| Category | Technology | Description |
+|----------|------------|-------------|
+| **Frontend/Backend** | Next.js 15 (App Router) | Full-stack framework with Server Actions |
+| **UI Components** | Shadcn UI + Tailwind CSS | Modern, minimalist design |
+| **Database** | SQLite (via Prisma ORM) | Local-first, lightweight, easy backup |
+| **Encryption** | Node.js `crypto` (AES-256-GCM) | End-to-end encryption |
+| **Task Scheduling** | node-cron | Local scheduled tasks |
+| **Email Service** | Resend API | Clean email sending service |
+
+## 📦 Quick Start
+
+### Prerequisites
+
+- Node.js 18+
+- pnpm 8+
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/AiKiAi-stack/1Token.git
+cd 1Token
+
+# Install dependencies
+pnpm install
+
+# Generate Prisma client
+pnpm db:generate
+
+# Push database schema
+pnpm db:push
+
+# Start development server
+pnpm dev
+```
+
+Open your browser and visit [http://localhost:3000](http://localhost:3000)
+
+### Available Scripts
+
+```bash
+pnpm dev              # Start development server
+pnpm build            # Build for production
+pnpm start            # Start production server
+pnpm lint             # Run linter
+pnpm db:generate      # Generate Prisma client
+pnpm db:push          # Push database schema
+pnpm db:studio        # Open Prisma Studio
+pnpm cli:build        # Build CLI tool
+pnpm cli:dev          # Run CLI in development mode
+```
+
+## 💻 CLI Usage
+
+### Basic Commands
+
+```bash
+# Get token for a platform and copy to clipboard
+pnpm cli:dev get github
+pnpm cli:dev get "AWS"
+pnpm cli:dev get pypi
+
+# List all tokens
+pnpm cli:dev list
+pnpm cli:dev ls
+
+# Show help
+pnpm cli:dev help
+```
+
+### Build Executable
+
+```bash
+# Build CLI
+pnpm cli:build
+
+# Use compiled CLI
+./cli/dist/index.js get github
+```
+
+### Clipboard Support
+
+| Platform | Tool | Installation |
+|----------|------|--------------|
+| macOS | pbcopy | Built-in |
+| Linux | xclip / xsel | `sudo apt install xclip` |
+| Windows | clip | Built-in |
+
+## 🔐 Security Architecture
+
+### Encryption Flow
+
+1. **Token Storage**:
+   - User enters token plaintext
+   - Master Password derives key (PBKDF2 + scrypt)
+   - AES-256-GCM encryption, stored as Base64 ciphertext
+   - Encryption parameters (iv, authTag, salt) stored with ciphertext
+
+2. **Token Decryption**:
+   - User enters Master Password
+   - Re-derive key using stored salt
+   - Decrypt in memory, never write to disk
+   - Clear from clipboard after copy
+
+### Security Best Practices
+
+1. **Master Password Not Stored**: Only bcrypt hash stored, derived key in Session
+2. **Frontend Masking**: Tokens show `********` by default, decrypt on click/copy
+3. **Server-Side Encryption**: Tokens encrypted before storage, decrypted in memory only
+4. **Session Expiry**: Destroy derived key on logout or session expiration
+5. **Log Sanitization**: Never log any token plaintext
+
+## 📁 Project Structure
+
+```
+1token/
+├── app/                    # Next.js App Router
+│   ├── api/                # API routes
+│   ├── dashboard/          # Main dashboard
+│   ├── login/              # Login page
+│   └── layout.tsx          # Root layout
+├── cli/                    # CLI command-line tool
+│   ├── dist/               # Compiled output
+│   ├── index.ts            # CLI entry point
+│   └── tsconfig.json       # CLI TypeScript config
+├── components/             # React components
+│   ├── ui/                 # Shadcn UI components
+│   ├── token/              # Token-related components
+│   └── layout/             # Layout components
+├── lib/                    # Utility functions
+│   ├── crypto.ts           # Encryption/Decryption
+│   ├── auth.ts             # Authentication logic
+│   └── db.ts               # Prisma client
+├── prisma/                 # Database
+│   ├── schema.prisma       # Schema definition
+│   └── dev.db              # SQLite database
+├── scripts/                # Scripts
+│   └── expiry-reminder.ts  # Expiration reminder task
+└── tests/                  # Test files
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow the standard workflow:
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+### Development Setup
+
+```bash
+git clone https://github.com/AiKiAi-stack/1Token.git
+cd 1Token
+pnpm install
+pnpm db:generate
+pnpm db:push
+pnpm dev
+```
+
+### Code Style
+
+- Use Prettier for code formatting
+- Follow ESLint rules
+- Write meaningful commit messages
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+
+**Made with ❤️ by AiKiAi-stack**
+
+[⬆ Back to Top](#1token)
+
+</div>
+
+---
+
+## 🌟 功能特性
+
+- 🔐 **端到端加密**：AES-256-GCM 加密算法，Token 在数据库中始终以密文存储
 - 🎯 **Master Password 验证**：bcrypt 哈希 + salt，密码永不落库
 - 📋 **一键复制**：Token 默认遮蔽显示，点击或复制时自动解密
 - 🏷️ **标签分类**：支持 Prod、Test、CI/CD 等标签，快速筛选
@@ -36,16 +227,9 @@
 - ⏰ **过期提醒**：Token 过期前 7 天自动发送邮件提醒
 - 🌙 **暗黑模式**：完整支持明/暗主题切换，系统主题自动检测
 - 💾 **本地存储**：SQLite 数据库，轻量易备份，数据完全本地化
+- 💻 **CLI 工具**：`1token get <platform>` 快速获取并复制 Token
 
-### CLI 工具 / CLI Tool
-
-- 🚀 **快速获取**：`1token get <platform>` 一键调取 Token 并复制到剪贴板
-- 📋 **列出所有**：`1token list` 查看所有 Token 状态
-- 🖥️ **跨平台支持**：macOS (pbcopy) / Linux (xclip) / Windows (clip)
-
-## 🛠 技术栈 / Tech Stack
-
-### 核心栈 / Core Stack
+## 🛠 技术栈
 
 | 类别 | 技术 | 说明 |
 |------|------|------|
@@ -56,45 +240,36 @@
 | **任务调度** | node-cron | 本地定时任务 |
 | **邮件服务** | Resend API | 简洁的邮件发送服务 |
 
-### 开发工具 / Dev Tools
+## 📦 快速开始
 
-| 工具 | 用途 |
-|------|------|
-| **包管理** | pnpm |
-| **类型检查** | TypeScript 5 |
-| **代码规范** | ESLint + Prettier |
-| **测试** | Vitest + Playwright |
+### 前置要求
 
-## 📦 快速开始 / Quick Start
-
-### 前置要求 / Prerequisites
-
-- Node.js 18+ 
+- Node.js 18+
 - pnpm 8+
 
-### 安装步骤 / Installation
+### 安装步骤
 
 ```bash
-# 1. 克隆项目
+# 克隆项目
 git clone https://github.com/AiKiAi-stack/1Token.git
 cd 1Token
 
-# 2. 安装依赖
+# 安装依赖
 pnpm install
 
-# 3. 生成 Prisma 客户端
+# 生成 Prisma 客户端
 pnpm db:generate
 
-# 4. 推送数据库 Schema
+# 推送数据库 Schema
 pnpm db:push
 
-# 5. 启动开发服务器
+# 启动开发服务器
 pnpm dev
 ```
 
 打开浏览器访问 [http://localhost:3000](http://localhost:3000)
 
-### 可用脚本 / Available Scripts
+### 可用脚本
 
 ```bash
 pnpm dev              # 启动开发服务器
@@ -110,11 +285,7 @@ pnpm cli:dev          # 开发模式运行 CLI
 
 ## 💻 CLI 使用指南
 
-### 安装 / Installation
-
-CLI 工具已包含在项目中，无需单独安装。
-
-### 基本用法 / Basic Usage
+### 基本命令
 
 ```bash
 # 获取指定平台的 Token 并复制到剪贴板
@@ -130,7 +301,7 @@ pnpm cli:dev ls
 pnpm cli:dev help
 ```
 
-### 编译为可执行文件 / Build Executable
+### 编译为可执行文件
 
 ```bash
 # 编译 CLI
@@ -140,7 +311,7 @@ pnpm cli:build
 ./cli/dist/index.js get github
 ```
 
-### 跨平台剪贴板支持 / Clipboard Support
+### 跨平台剪贴板支持
 
 | 平台 | 工具 | 安装方式 |
 |------|------|----------|
@@ -150,7 +321,7 @@ pnpm cli:build
 
 ## 🔐 安全架构
 
-### 加密流程 / Encryption Flow
+### 加密流程
 
 1. **Token 存储**：
    - 用户输入 Token 明文
@@ -164,7 +335,7 @@ pnpm cli:build
    - 内存中解密，永不落盘
    - 复制到剪贴板后自动清除
 
-### 安全最佳实践 / Security Best Practices
+### 安全最佳实践
 
 1. **Master Password 不落库**：仅存储 bcrypt 哈希，派生密钥存于 Session
 2. **前端遮蔽**：Token 默认显示 `********`，点击/复制时解密
@@ -201,33 +372,7 @@ pnpm cli:build
 └── tests/                  # 测试文件
 ```
 
-## 🗺 开发路线图
-
-### Phase 1: 核心保险库 (MVP) ✅
-
-- [x] 项目初始化
-- [x] 安全架构实现
-- [x] Token CRUD 功能
-
-### Phase 2: 智能管理体验 ✅
-
-- [x] 可视化状态指示
-- [x] 标签系统与搜索
-- [x] 权限清单记录
-
-### Phase 3: 自动化提醒 ✅
-
-- [x] 邮件系统集成
-- [x] 后台扫描任务
-- [x] 安全审计日志
-
-### Phase 4: 开发者体验增强 ✅
-
-- [x] 导出功能（.env 格式）
-- [x] 暗黑模式
-- [x] CLI 桥接工具
-
-## 🤝 贡献指南 / Contributing
+## 🤝 贡献指南
 
 欢迎贡献！请遵循以下流程：
 
@@ -237,7 +382,7 @@ pnpm cli:build
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 开启 Pull Request
 
-### 开发环境设置 / Setup Development Environment
+### 开发环境设置
 
 ```bash
 git clone https://github.com/AiKiAi-stack/1Token.git
@@ -248,13 +393,13 @@ pnpm db:push
 pnpm dev
 ```
 
-### 代码规范 / Code Style
+### 代码规范
 
 - 使用 Prettier 格式化代码
 - 遵循 ESLint 规则
 - 编写有意义的提交信息
 
-## 📄 许可证 / License
+## 📄 许可证
 
 本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
@@ -262,8 +407,8 @@ pnpm dev
 
 <div align="center">
 
-**Made with ❤️ by AiKiAi-stack**
+**由 AiKiAi-stack 用 ❤️ 打造**
 
-[⬆ 返回顶部](#1token---api-token-保险库)
+[⬆ 返回顶部](#1token)
 
 </div>

@@ -7,7 +7,9 @@ import { TokenList } from '@/components/token/token-list'
 import { TokenForm } from '@/components/token/token-form'
 import { TokenView } from '@/components/token/token-view'
 import { decrypt } from '@/lib/crypto'
-
+import { ExportDialog } from '@/components/layout/export-dialog'
+import { ThemeToggle } from '@/components/layout/theme-toggle'
+import { getExpiryStatus } from '@/lib/expiry'
 interface Token {
   id: string
   platform: string
@@ -30,6 +32,7 @@ export default function DashboardPage() {
   const [editingToken, setEditingToken] = useState<Token | null>(null)
   const [viewingToken, setViewingToken] = useState<Token | null>(null)
   const [masterPassword, setMasterPassword] = useState<string | null>(null)
+  const [showExport, setShowExport] = useState(false)
 
   useEffect(() => {
     const sessionToken = localStorage.getItem('sessionToken')
@@ -183,8 +186,12 @@ export default function DashboardPage() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold">1Token</h1>
           <div className="flex gap-2">
+            <ThemeToggle />
             <Button variant="outline" onClick={() => router.push('/dashboard/audit')}>
               Audit Log
+            </Button>
+            <Button variant="outline" onClick={() => setShowExport(true)}>
+              Export
             </Button>
             <Button variant="outline" onClick={handleLogout}>
               Lock Vault
@@ -242,6 +249,13 @@ export default function DashboardPage() {
             onEdit={setEditingToken}
             onDelete={handleDeleteToken}
             onViewToken={handleViewToken}
+          />
+        )}
+
+        {showExport && (
+          <ExportDialog
+            tags={[...new Set(tokens.flatMap(t => t.tags.split(',').map(t => t.trim()).filter(Boolean))]}
+            onClose={() => setShowExport(false)}
           />
         )}
       </main>

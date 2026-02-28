@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { SCOPE_PRESETS, getScopePresets, getDefaultExpiryDays } from '@/lib/scope-presets'
 
 interface TokenFormProps {
   onSubmit: (data: {
@@ -36,6 +37,25 @@ export function TokenForm({ onSubmit, initialData, onCancel }: TokenFormProps) {
   const [tags, setTags] = useState(initialData?.tags || '')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPresets, setShowPresets] = useState(false)
+
+  useEffect(() => {
+    if (platform && !initialData && !expiresAt) {
+      const defaultDays = getDefaultExpiryDays(platform)
+      if (defaultDays) {
+        const date = new Date()
+        date.setDate(date.getDate() + defaultDays)
+        setExpiresAt(date.toISOString().split('T')[0])
+      }
+    }
+  }, [platform, initialData, expiresAt])
+
+  const handleSelectPreset = (presetScopes: string[]) => {
+    setScopes(presetScopes.join(', '))
+    setShowPresets(false)
+  }
+
+  const presets = platform ? getScopePresets(platform) : []
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -79,7 +99,13 @@ export function TokenForm({ onSubmit, initialData, onCancel }: TokenFormProps) {
               onChange={(e) => setPlatform(e.target.value)}
               required
               disabled={isLoading}
+              list="platform-suggestions"
             />
+            <datalist id="platform-suggestions">
+              {SCOPE_PRESETS.map(preset => (
+                <option key={preset.platform} value={preset.platform} />
+              ))}
+            </datalist>
           </div>
 
           {!initialData && (
@@ -115,9 +141,21 @@ export function TokenForm({ onSubmit, initialData, onCancel }: TokenFormProps) {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium" htmlFor="scopes">
-              Scopes / Permissions
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium" htmlFor="scopes">
+                Scopes / Permissions
+              </label>
+              {presets.length > 0 && !initialData && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowPresets(!showPresets)}
+                >
+                  Use Preset
+                </Button>
+              )}
+            </div>
             <Input
               id="scopes"
               placeholder="e.g., repo, user:email, read:org"
@@ -125,6 +163,25 @@ export function TokenForm({ onSubmit, initialData, onCancel }: TokenFormProps) {
               onChange={(e) => setScopes(e.target.value)}
               disabled={isLoading}
             />
+            
+            {showPresets && presets.length > 0 && (
+              <div className="space-y-2 border rounded-md p-3 mt-2">
+                <p className="text-xs text-muted-foreground">Select a preset:</p>
+                {presets.map((preset, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleSelectPreset(preset.scopes)}
+                    className="w-full text-left p-2 hover:bg-secondary rounded text-sm"
+                  >
+                    <p className="font-medium">{preset.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {preset.scopes.join(', ')}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -138,6 +195,13 @@ export function TokenForm({ onSubmit, initialData, onCancel }: TokenFormProps) {
               onChange={(e) => setExpiresAt(e.target.value)}
               disabled={isLoading}
             />
+            {platform && !initialData && (
+              <p className="text-xs text-muted-foreground">
+                {getDefaultExpiryDays(platform) 
+                  ? `Suggested: ${getDefaultExpiryDays(platform)} days for ${platform}`
+                  : `${platform} tokens typically don't expire`}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

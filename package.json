@@ -1,7 +1,10 @@
 {
-  "name": "1token-temp",
+  "name": "1token",
   "version": "0.1.0",
   "private": true,
+  "bin": {
+    "1token": "./cli/dist/index.js"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,7 +12,10 @@
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "cli:build": "tsc --project cli/tsconfig.json",
+    "cli:dev": "tsx cli/index.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",
@@ -26,6 +32,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
+    "tsx": "^4.0.0",
     "typescript": "^5"
   }
 }

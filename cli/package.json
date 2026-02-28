@@ -1,0 +1,35 @@
+{
+  "name": "1token-cli",
+  "version": "0.1.0",
+  "description": "CLI tool for 1Token - Secure API Token Manager",
+  "main": "cli/index.ts",
+  "bin": {
+    "1token": "cli/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --project cli/tsconfig.json",
+    "cli:dev": "tsx cli/index.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.15.0",
+    "tsx": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5",
+    "pkg": "^5.8.1"
+  },
+  "pkg": {
+    "assets": [
+      "node_modules/**/*",
+      "prisma/schema.prisma"
+    ],
+    "targets": [
+      "node18-linux-x64",
+      "node18-win-x64",
+      "node18-macos-x64",
+      "node18-macos-arm64"
+    ],
+    "outputPath": "dist"
+  }
+}

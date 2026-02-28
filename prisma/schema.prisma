@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Token {
+  id           String   @id @default(cuid())
+  platform     String   // 平台名称：GitHub, PyPI, AWS 等
+  encryptedVal String   // AES-256-GCM 加密后的 Base64 密文
+  iv           String   // 加密初始化向量
+  authTag      String   // GCM 认证标签
+  purpose      String   // 用途描述
+  scopes       String?  // 权限范围（JSON 字符串或逗号分隔）
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  expiresAt    DateTime? // 过期时间
+  lastUsed     DateTime? // 最后使用时间
+  tags         String   // 标签，逗号分隔
+  reminded     Boolean  @default(false) // 是否已发送过期提醒
+  isActive     Boolean  @default(true)  // 是否激活
+}

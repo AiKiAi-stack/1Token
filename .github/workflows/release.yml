@@ -153,24 +153,25 @@ jobs:
           # Create a simple JavaScript entry point
           echo 'const { spawn } = require("child_process");
           const path = require("path");
-          
-          // Resolve the absolute path to the CLI
           const cliPath = path.resolve(__dirname, "dist", "index.js");
-          
-          // Spawn Node.js process with the CLI
           const child = spawn("node", [cliPath, ...process.argv.slice(2)], {
             stdio: [process.stdin, process.stdout, process.stderr]
           });
-          
           child.on("close", (code) => {
             process.exit(code);
           });' > cli-entry.js
           
           # Use pkg to create standalone executable
-          pkg cli-entry.js \
-            --targets node18-${{ matrix.platform }}-${{ matrix.arch }} \
-            --output dist/${{ matrix.output_name }}
-            
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            # Windows PowerShell - no line continuation
+            pkg cli-entry.js --targets node18-windows-x64 --output dist/1token.exe
+          elif [[ "$RUNNER_OS" == "macOS" ]] && [[ "${{ matrix.arch }}" == "arm64" ]]; then
+            pkg cli-entry.js --targets node18-macos-arm64 --output dist/1token
+          else
+            # Linux or macOS Intel
+            pkg cli-entry.js --targets node18-${{ matrix.platform }}-${{ matrix.arch }} --output dist/${{ matrix.output_name }}
+          fi
+
       - name: Create archive
         shell: bash
         run: |

@@ -6,193 +6,155 @@ on:
       - 'v*'  # Trigger on tags like v1.0.0
 
 permissions:
-  contents: write  # Required to create releases
+  contents: write  # Required for creating releases
 
 jobs:
-  create_release:
-    name: Create Release
+  release:
+    name: Build and Release CLI
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          fetch-depth: 0
+          node-version: '18'
+          
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8.x
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm db:generate
+
+      - name: Build CLI distribution  
+        run: |
+          mkdir -p cli/dist
+          cp cli/cli-tool.js cli/dist/cli-tool.js
+          chmod +x cli/dist/cli-tool.js
 
       - name: Generate Release Notes
         id: release_notes
         run: |
-          # Get current tag
-          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${{ github.ref_name }}
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git tag | sort -V | head -n 1)
           
-          # Get commits since last tag
-          git fetch --all
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          
-          if [ "$LAST_TAG" != "$TAG" ] && [ -n "$LAST_TAG" ]; then
-            COMMITS=$(git log --oneline "$LAST_TAG..$TAG" 2>/dev/null || git log --oneline "$TAG~..$TAG" 2>/dev/null)
-          elif git rev-list --count HEAD --max-count=10 2>/dev/null > /dev/null; then
-            # If no previous tag, grab recent commits
-            COMMITS=$(git log --oneline -20)
+          if [ -n "$LAST_TAG" ]; then
+            COMMITS=$(git log --oneline "$LAST_TAG..HEAD")
           else
-            COMMITS="Initial release"
+            COMMITS=$(git log --oneline)
           fi
           
-          # Get contributors
-          CONTRIBUTORS=$(git log --oneline "$LAST_TAG..$TAG" --pretty=format:"%an" 2>/dev/null | sort | uniq -c | sort -nr | awk '{print $2}')
+          NOTES="## CLI Tool Features\n\n"
+          NOTES="${NOTES}- \`1token get <platform>\` - Get token and copy to clipboard\n"
+          NOTES="${NOTES}- \`1token list\` - List all tokens\n"
+          NOTES="${NOTES}- Cross-platform clipboard support\n"
+          NOTES="${NOTES}- Secure end-to-end encryption\n\n"
+          NOTES="${NOTES}## Changelog\n"
           
-          # Create release notes content
-          CONTENT="# Release Notes for $TAG\n\n"
+          for commit in $COMMITS; do
+            if [ -n "$commit" ]; then
+              NOTES="${NOTES}\n- $commit"
+            fi
+          done
           
-          if [ -n "$COMMITS" ] && [ "$COMMITS" != "Initial release" ]; then
-            CONTENT="$CONTENT## What's Changed\n"
-            echo "$COMMITS" | while IFS= read -r line; do
-              if [ -n "$line" ]; then
-                CONTENT="$CONTENT- $(echo $line | cut -d' ' -f2-)\n"
-              fi
-            done
-            CONTENT="$CONTENT\n"
-          else
-            CONTENT="$CONTENT## Initial Release\n"
-            CONTENT="$CONTENT- Initial CLI tool\n\n"
-          fi
-          
-          # Add contributors
-          if [ -n "$CONTRIBUTORS" ]; then
-            CONTENT="$CONTENT## Contributors\n"
-            echo "$CONTRIBUTORS" | while read -r line; do
-              if [ -n "$line" ]; then
-                CONTENT="$CONTENT- @$line\n"
-              fi
-            done
-            CONTENT="$CONTENT\n"
-          fi
-          
-          CONTENT="$CONTENT## Artifacts\n"
-          CONTENT="$CONTENTThis release includes pre-compiled binaries for:\n"
-          CONTENT="$CONTENT- Windows (x64)\n"
-          CONTENT="$CONTENT- macOS (Intel/Apple Silicon)\n"
-          CONTENT="$CONTENT- Linux (x64)\n"
-          
-          # Escape quotes and create output variable
-          echo "content<<EOF" >> $GITHUB_OUTPUT
-          echo -e "$CONTENT" 2>/dev/null >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          ESCAPED=$(echo "$NOTES" | sed ':a;N;$!ba;s/\n/\\n/g')
+          echo "body=$ESCAPED" >> $GITHUB_OUTPUT
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release 
         id: create_release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
         with:
           name: Release ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
-          body: ${{ steps.release_notes.outputs.content }}
+          body: ${{ steps.release_notes.outputs.body }}
           draft: false
           prerelease: false
 
-  # Build for each platform
-  build:
-    name: Build (${{ matrix.os }}-${{ matrix.arch }})
-    needs: create_release
+  build-platforms:
+    needs: release
+    name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
-            arch: x64
-            platform: linux
-            target: linux-x64
-            output_name: 1token
+            platform: linux-x64
+            artifact: 1token-linux.tar.gz
+            
           - os: windows-latest
-            arch: x64
-            platform: windows
-            target: win-x64
-            output_name: 1token.exe
+            platform: windows-x64
+            artifact: 1token-windows.zip
+            
           - os: macos-latest
-            arch: x64
-            platform: darwin
-            target: macos-x64
-            output_name: 1token
+            platform: macos-x64
+            artifact: 1token-macos.tar.gz
+            
           - os: macos-latest
-            arch: arm64
-            platform: darwin
-            target: macos-arm64
-            output_name: 1token
+            platform: macos-arm64
+            artifact: 1token-macos-arm64.tar.gz
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 8
-          
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'pnpm'
           
-      - name: Install dependencies
-        run: |
-          pnpm install --no-frozen-lockfile
-          pnpm db:generate
-          pnpm cli:build
-          
-      - name: Install pkg globally
-        run: npm install -g pkg
-        
-      - name: Install OS specific dependencies
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev wget
-          
-      - name: Build executable with pkg
-        shell: bash
-        run: |
-          echo 'const { spawn } = require("child_process");
-          const path = require("path");
-          const cliPath = path.resolve(__dirname, "dist", "index.js");
-          const child = spawn("node", [cliPath, ...process.argv.slice(2)], {
-            stdio: [process.stdin, process.stdout, process.stderr]
-          });
-          child.on("close", (code) => {
-            process.exit(code);
-          });' > cli-entry.js
-          
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            pkg cli-entry.js --targets node18-windows-x64 --output dist/1token.exe
-          elif [ "$RUNNER_OS" = "macOS" ] && [ "${{ matrix.arch }}" = "arm64" ]; then
-            pkg cli-entry.js --targets node18-macos-arm64 --output dist/1token
-          elif [ "$RUNNER_OS" = "Linux" ]; then
-            pkg cli-entry.js --targets node18-linux-x64 --output dist/1token
-          else
-            pkg cli-entry.js --targets node18-macos-x64 --output dist/1token
-          fi
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8.x
 
-      - name: Create archive
-        shell: bash
+      - name: Prepare CLI
+        run: |
+          mkdir -p cli/dist
+          cp cli/cli-tool.js cli/dist/1token
+          chmod +x cli/dist/1token
+          
+          echo '{
+            "name": "1token-cli",
+            "version": "0.1.1",
+            "bin": { "1token": "./1token" },
+            "description": "Secure API Token Manager CLI",
+            "dependencies": { "node-fetch": "^2.7.0" }
+          }' > cli/dist/package.json
+
+      - name: Create ${{ matrix.platform }} package
         run: |
           VERSION=${{ github.ref_name }}
+          PLATFORM_NAME="${{ matrix.platform }}"
+          OUTPUT_DIR="1token-${VERSION}-${PLATFORM_NAME}"
+          mkdir -p "$OUTPUT_DIR"
           
-          # Create archive using platform-specific tool
+          cp cli/dist/1token "$OUTPUT_DIR/"
+          cp cli/dist/package.json "$OUTPUT_DIR/"
+          
+          cd "$OUTPUT_DIR"
+          npm install node-fetch@2
+          cd ..
+          
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            # ZIP on Windows
-            7z a "1token-${VERSION}-${{ matrix.target }}.zip" "dist/"
-            echo "archive_name=1token-${VERSION}-${{ matrix.target }}.zip" >> $GITHUB_ENV
+            7z a "${OUTPUT_DIR}.zip" "$OUTPUT_DIR/"
+            echo "ARTIFACT_FILE=${OUTPUT_DIR}.zip" >> $GITHUB_ENV
           else
-            # Tar-gz on Unix-like systems
-            tar -czf "1token-${VERSION}-${{ matrix.target }}.tar.gz" -C dist .
-            echo "archive_name=1token-${VERSION}-${{ matrix.target }}.tar.gz" >> $GITHUB_ENV
+            tar -czf "${OUTPUT_DIR}.tar.gz" "$OUTPUT_DIR/"
+            echo "ARTIFACT_FILE=${OUTPUT_DIR}.tar.gz" >> $GITHUB_ENV
           fi
 
-      - name: Upload Release Asset
+      - name: Upload ${{ matrix.platform }} asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: ./${{ env.archive_name }}
-          asset_name: ${{ env.archive_name }}
-          asset_content_type: application/octet-stream
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          asset_path: ./${{ env.ARTIFACT_FILE }}
+          asset_name: ${{ env.ARTIFACT_FILE }}
+          asset_content_type: application/gzip

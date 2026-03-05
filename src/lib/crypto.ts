@@ -5,7 +5,7 @@ const KEY_LENGTH = 32 // 256 bits
 const IV_LENGTH = 16
 const AUTH_TAG_LENGTH = 16
 const SALT_LENGTH = 32
-const ITERATIONS = 100000
+const ITERATIONS = 16384 // N parameter for scrypt (2^14)
 
 /**
  * Derive a 256-bit key from a password using scrypt

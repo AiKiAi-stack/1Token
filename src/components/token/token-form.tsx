@@ -102,10 +102,11 @@ export function TokenForm({ onSubmit, initialData, onCancel }: TokenFormProps) {
               list="platform-suggestions"
             />
             <datalist id="platform-suggestions">
-              {SCOPE_PRESETS.map(preset => (
-                <option key={preset.platform} value={preset.platform} />
+              {SCOPE_PRESETS.map((preset, index) => (
+                <option key={`${preset.platform}-${index}`} value={preset.platform} />
               ))}
             </datalist>
+
           </div>
 
           {!initialData && (

@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { toast } from 'sonner'
 
 interface Token {
   id: string
@@ -42,15 +44,28 @@ export function TokenView({ token, onClose, onDecrypt }: TokenViewProps) {
       const value = await onDecrypt(token, password)
       setDecryptedValue(value)
       setIsDecrypted(true)
+      toast.success('Token decrypted successfully')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to decrypt')
+      toast.error('Failed to decrypt token', {
+        description: err instanceof Error ? err.message : 'Invalid password',
+      })
     } finally {
       setIsLoading(false)
     }
   }
 
   const copyToClipboard = async () => {
-    await navigator.clipboard.writeText(decryptedValue)
+    try {
+      await navigator.clipboard.writeText(decryptedValue)
+      toast.success('Token copied to clipboard', {
+        description: 'The token has been copied securely.',
+      })
+    } catch (err) {
+      toast.error('Failed to copy', {
+        description: 'Could not access clipboard.',
+      })
+    }
   }
 
   return (
@@ -110,6 +125,7 @@ export function TokenView({ token, onClose, onDecrypt }: TokenViewProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
+                onKeyDown={(e) => e.key === 'Enter' && handleDecrypt()}
               />
               <Button onClick={handleDecrypt} disabled={isLoading}>
                 {isLoading ? 'Decrypting...' : 'Decrypt'}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { decrypt } from '@/lib/crypto'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -98,6 +99,78 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     console.error('Delete token error:', error)
     return NextResponse.json(
       { error: 'Failed to delete token' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST decrypt token
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const id = (await params).id
+    const body = await request.json()
+    const { password } = body
+
+    if (!password) {
+      return NextResponse.json(
+        { error: 'Password required' },
+        { status: 400 }
+      )
+    }
+
+    // Get token from database
+    const token = await prisma.token.findUnique({
+      where: { id, isActive: true }
+    })
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Token not found' },
+        { status: 404 }
+      )
+    }
+
+    if (!token.encryptedVal || !token.iv || !token.authTag || !token.salt) {
+      return NextResponse.json(
+        { error: 'Token data incomplete' },
+        { status: 400 }
+      )
+    }
+
+    // Attempt to decrypt using provided password
+    try {
+      const decrypted = await decrypt(
+        token.encryptedVal,
+        token.iv,
+        token.authTag,
+        token.salt,
+        password
+      )
+
+      // Update lastUsed timestamp
+      await prisma.token.update({
+        where: { id },
+        data: { lastUsed: new Date() },
+      })
+
+      return NextResponse.json({
+        decrypted,
+        platform: token.platform
+      })
+    } catch (error) {
+      console.error('Decryption error:', error)
+      return NextResponse.json(
+        { error: 'Invalid password' },
+        { status: 401 }
+      )
+    }
+  } catch (error) {
+    console.error('Decrypt token error:', error)
+    return NextResponse.json(
+      { error: 'Failed to decrypt token' },
       { status: 500 }
     )
   }

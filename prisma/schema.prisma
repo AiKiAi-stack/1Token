@@ -24,4 +24,10 @@ model Token {
   tags         String   // 标签，逗号分隔
   reminded     Boolean  @default(false) // 是否已发送过期提醒
   isActive     Boolean  @default(true)  // 是否激活
+
+  @@index([platform])
+  @@index([tags])
+  @@index([expiresAt])
+  @@index([isActive])
+  @@index([createdAt])
 }

@@ -5,10 +5,11 @@ import { getExpiryStatus, type ExpiryInfo } from '@/lib/expiry'
 
 interface ExpiryBadgeProps {
   expiresAt?: string | null
+  createdAt?: string | null
   showProgress?: boolean
 }
 
-export function ExpiryBadge({ expiresAt, showProgress = false }: ExpiryBadgeProps) {
+export function ExpiryBadge({ expiresAt, createdAt, showProgress = false }: ExpiryBadgeProps) {
   const expiryInfo = getExpiryStatus(expiresAt)
   const [progress, setProgress] = useState<number | null>(null)
 
@@ -18,9 +19,12 @@ export function ExpiryBadge({ expiresAt, showProgress = false }: ExpiryBadgeProp
       const updateProgress = () => {
         const now = new Date()
         const expiryDate = new Date(expiresAt)
-        const createdAt = new Date(expiryDate.getTime() - 90 * 24 * 60 * 60 * 1000)
-        const totalDuration = expiryDate.getTime() - createdAt.getTime()
-        const elapsedDuration = now.getTime() - createdAt.getTime()
+        const startDate = createdAt
+          ? new Date(createdAt)
+          : new Date(expiryDate.getTime() - 90 * 24 * 60 * 60 * 1000)
+        const totalDuration = expiryDate.getTime() - startDate.getTime()
+        if (totalDuration <= 0) { setProgress(100); return }
+        const elapsedDuration = now.getTime() - startDate.getTime()
         const percentage = (elapsedDuration / totalDuration) * 100
         setProgress(Math.min(100, Math.max(0, percentage)))
       }
@@ -29,7 +33,7 @@ export function ExpiryBadge({ expiresAt, showProgress = false }: ExpiryBadgeProp
       const interval = setInterval(updateProgress, 60000)
       return () => clearInterval(interval)
     }
-  }, [expiresAt, showProgress])
+  }, [expiresAt, createdAt, showProgress])
 
   return (
     <div className="inline-flex flex-col gap-1">

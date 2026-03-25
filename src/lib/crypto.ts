@@ -5,7 +5,7 @@ const KEY_LENGTH = 32 // 256 bits
 const IV_LENGTH = 16
 const AUTH_TAG_LENGTH = 16
 const SALT_LENGTH = 32
-const ITERATIONS = 16384 // N parameter for scrypt (2^14)
+const SCRYPT_N = 16384 // CPU/memory cost, must be power of 2
 
 /**
  * Derive a 256-bit key from a password using scrypt
@@ -13,7 +13,7 @@ const ITERATIONS = 16384 // N parameter for scrypt (2^14)
 export async function deriveKey(password: string, salt: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     scrypt(password, salt, KEY_LENGTH, {
-      N: ITERATIONS,
+      N: SCRYPT_N,
       r: 8,
       p: 1,
       maxmem: 128 * 1024 * 1024,

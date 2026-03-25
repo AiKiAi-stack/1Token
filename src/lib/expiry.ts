@@ -33,7 +33,7 @@ export function getExpiryStatus(expiresAt?: string | null): ExpiryInfo {
     }
   }
 
-  if (daysLeft === 0) {
+  if (daysLeft < 1) {
     return {
       status: 'critical',
       label: 'Expires today',
@@ -42,16 +42,7 @@ export function getExpiryStatus(expiresAt?: string | null): ExpiryInfo {
     }
   }
 
-  if (daysLeft < 7) {
-    return {
-      status: 'critical',
-      label: `${daysLeft} day${daysLeft === 1 ? '' : 's'}`,
-      colorClass: 'text-red-600 font-semibold bg-red-50 dark:bg-red-950/20 px-2 py-0.5 rounded',
-      daysLeft,
-    }
-  }
-
-  if (daysLeft < 30) {
+  if (daysLeft <= 7) {
     return {
       status: 'warning',
       label: `${daysLeft} day${daysLeft === 1 ? '' : 's'}`,
@@ -60,9 +51,18 @@ export function getExpiryStatus(expiresAt?: string | null): ExpiryInfo {
     }
   }
 
+  if (daysLeft <= 30) {
+    return {
+      status: 'safe',
+      label: `${daysLeft} day${daysLeft === 1 ? '' : 's'}`,
+      colorClass: 'text-green-600 bg-green-50 dark:bg-green-950/20 px-2 py-0.5 rounded',
+      daysLeft,
+    }
+  }
+
   return {
     status: 'safe',
-    label: `${daysLeft} day${daysLeft === 1 ? '' : 's'}`,
+    label: `${daysLeft} days`,
     colorClass: 'text-green-600 bg-green-50 dark:bg-green-950/20 px-2 py-0.5 rounded',
     daysLeft,
   }
@@ -82,17 +82,21 @@ export function formatDate(dateString?: string | null): string {
 
 /**
  * Get expiry progress percentage (for progress bar)
- * Assumes 90 days as typical token lifetime
+ * Uses actual createdAt if provided, otherwise falls back to 90-day assumption
  */
-export function getExpiryProgress(expiresAt?: string | null): number | null {
+export function getExpiryProgress(expiresAt?: string | null, createdAt?: string | null): number | null {
   if (!expiresAt) return null
 
   const now = new Date()
   const expiryDate = new Date(expiresAt)
-  const createdAt = new Date(expiryDate.getTime() - 90 * 24 * 60 * 60 * 1000) // Assume 90 days lifetime
+  const startDate = createdAt
+    ? new Date(createdAt)
+    : new Date(expiryDate.getTime() - 90 * 24 * 60 * 60 * 1000)
 
-  const totalDuration = expiryDate.getTime() - createdAt.getTime()
-  const elapsedDuration = now.getTime() - createdAt.getTime()
+  const totalDuration = expiryDate.getTime() - startDate.getTime()
+  if (totalDuration <= 0) return 100
+
+  const elapsedDuration = now.getTime() - startDate.getTime()
 
   const percentage = (elapsedDuration / totalDuration) * 100
   return Math.min(100, Math.max(0, percentage))

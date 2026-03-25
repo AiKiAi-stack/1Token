@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ExpiryBadge } from '@/components/ui/expiry-badge'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { getExpiryStatus } from '@/lib/expiry'
-import { toast } from 'sonner'
 
 interface Token {
   id: string
@@ -18,8 +17,6 @@ interface Token {
   createdAt: string
   expiresAt?: string | null
   hasValue: boolean
-  // Masked value for display (e.g., "ghp_****xxxx")
-  maskedValue?: string | null
 }
 
 interface TokenListProps {
@@ -31,37 +28,10 @@ interface TokenListProps {
 
 type FilterStatus = 'all' | 'valid' | 'warning' | 'critical' | 'expired'
 
-// Custom hook for debounced search
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value)
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedValue(value)
-    }, delay)
-
-    return () => {
-      clearTimeout(timer)
-    }
-  }, [value, delay])
-
-  return debouncedValue
-}
-
-// Mask token value: show first 4 and last 4 chars
-function maskTokenValue(value: string | null | undefined): string {
-  if (!value) return '********'
-  if (value.length <= 8) return '****' + value.slice(-4)
-  return value.slice(0, 4) + '****' + value.slice(-4)
-}
-
 export function TokenList({ tokens, onEdit, onDelete, onViewToken }: TokenListProps) {
-  const [searchInput, setSearchInput] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [filterTag, setFilterTag] = useState('')
-
-  // Debounce search input with 300ms delay
-  const searchTerm = useDebounce(searchInput, 300)
 
   // Extract all unique tags
   const allTags = useMemo(() => {
@@ -75,11 +45,11 @@ export function TokenList({ tokens, onEdit, onDelete, onViewToken }: TokenListPr
     return Array.from(tags)
   }, [tokens])
 
-  // Filter tokens using debounced search term
+  // Filter tokens
   const filteredTokens = useMemo(() => {
     return tokens.filter(token => {
-      // Search filter (uses debounced value)
-      const matchesSearch =
+      // Search filter
+      const matchesSearch = 
         token.platform.toLowerCase().includes(searchTerm.toLowerCase()) ||
         token.purpose.toLowerCase().includes(searchTerm.toLowerCase()) ||
         token.tags.toLowerCase().includes(searchTerm.toLowerCase())
@@ -92,7 +62,7 @@ export function TokenList({ tokens, onEdit, onDelete, onViewToken }: TokenListPr
         const statusMap: Record<FilterStatus, string[]> = {
           all: [],
           valid: ['safe', 'no-expiry'],
-          warning: ['warning'],
+          warning: ['warning', 'critical'],
           critical: ['critical'],
           expired: ['expired'],
         }
@@ -110,27 +80,17 @@ export function TokenList({ tokens, onEdit, onDelete, onViewToken }: TokenListPr
     })
   }, [tokens, searchTerm, filterStatus, filterTag])
 
-  // Copy token preview to clipboard
-  const handleCopyPreview = useCallback((token: Token) => {
-    const maskedValue = maskTokenValue(token.maskedValue)
-    navigator.clipboard.writeText(maskedValue).then(() => {
-      toast.success('Token preview copied', {
-        description: `${maskedValue} (preview only)`,
-      })
-    })
-  }, [])
-
   return (
     <div className="space-y-4">
       {/* Search and Filters */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center">
         <Input
           placeholder="Search tokens..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-md"
         />
-
+        
         <div className="flex flex-wrap gap-2">
           {/* Status Filter */}
           <select
@@ -140,8 +100,8 @@ export function TokenList({ tokens, onEdit, onDelete, onViewToken }: TokenListPr
           >
             <option value="all">All Status</option>
             <option value="valid">Valid</option>
-            <option value="warning">&lt; 30 days</option>
-            <option value="critical">&lt; 7 days</option>
+            <option value="warning">&lt; 7 days</option>
+            <option value="critical">&lt; 24h</option>
             <option value="expired">Expired</option>
           </select>
 
@@ -177,8 +137,7 @@ export function TokenList({ tokens, onEdit, onDelete, onViewToken }: TokenListPr
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredTokens.map((token) => {
             const expiryInfo = getExpiryStatus(token.expiresAt)
-            const displayValue = maskTokenValue(token.maskedValue)
-
+            
             return (
               <Card key={token.id} className="relative">
                 <CardHeader>
@@ -194,20 +153,12 @@ export function TokenList({ tokens, onEdit, onDelete, onViewToken }: TokenListPr
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {/* Token Preview with partial masking */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Token:</span>
-                      <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                        {displayValue}
-                      </code>
-                    </div>
-
                     {/* Expiry with progress bar */}
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Expires:</span>
-                      <ExpiryBadge expiresAt={token.expiresAt} showProgress />
+                      <ExpiryBadge expiresAt={token.expiresAt} createdAt={token.createdAt} showProgress />
                     </div>
-
+                    
                     {/* Tags */}
                     {token.tags && (
                       <div className="flex flex-wrap gap-1 pt-2">

@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     if (format === 'shell') {
       const content = exportData
-        .map(token => `export ${token.platform.toUpperCase()}_TOKEN="DECRYPT_NEEDED"`)
+        .map(token => `export ${token.platform.toUpperCase().replace(/\s+/g, '_')}_TOKEN="DECRYPT_NEEDED"`)
         .join('\n')
       return new NextResponse(content, {
         headers: {
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
 
     // Default: .env format
     const content = exportData
-      .map(token => `${token.platform.toUpperCase()}_TOKEN="DECRYPT_NEEDED"`)
+      .map(token => `${token.platform.toUpperCase().replace(/\s+/g, '_')}_TOKEN="DECRYPT_NEEDED"`)
       .join('\n')
     return new NextResponse(content, {
       headers: {

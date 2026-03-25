@@ -13,9 +13,8 @@ model Token {
   encryptedVal String   // AES-256-GCM 加密后的 Base64 密文
   iv           String   // 加密初始化向量
   authTag      String   // GCM 认证标签
-  salt         String   // 加密盐值
+  salt         String   // scrypt 密钥派生盐值
   purpose      String   // 用途描述
-
   scopes       String?  // 权限范围（JSON 字符串或逗号分隔）
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -24,10 +23,4 @@ model Token {
   tags         String   // 标签，逗号分隔
   reminded     Boolean  @default(false) // 是否已发送过期提醒
   isActive     Boolean  @default(true)  // 是否激活
-
-  @@index([platform])
-  @@index([tags])
-  @@index([expiresAt])
-  @@index([isActive])
-  @@index([createdAt])
 }

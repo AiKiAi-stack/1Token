@@ -5,14 +5,34 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { TokenList } from '@/components/token/token-list'
 import { TokenForm } from '@/components/token/token-form'
-import { ThemeToggle } from '@/components/layout/theme-toggle'
+import { TokenView } from '@/components/token/token-view'
+import { encrypt, decrypt } from '@/lib/crypto'
 import { ExportDialog } from '@/components/layout/export-dialog'
+import { ThemeToggle } from '@/components/layout/theme-toggle'
+
+interface Token {
+  id: string
+  platform: string
+  purpose: string
+  scopes?: string | null
+  tags: string
+  createdAt: string
+  expiresAt?: string | null
+  hasValue?: boolean
+  encryptedVal?: string
+  iv?: string
+  authTag?: string
+  salt?: string
+}
 
 export default function DashboardPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
-  const [tokens, setTokens] = useState<any[]>([])
+  const [tokens, setTokens] = useState<Token[]>([])
   const [showForm, setShowForm] = useState(false)
+  const [editingToken, setEditingToken] = useState<Token | null>(null)
+  const [viewingToken, setViewingToken] = useState<Token | null>(null)
+  const [masterPassword, setMasterPassword] = useState<string | null>(null)
   const [showExport, setShowExport] = useState(false)
 
   useEffect(() => {
@@ -40,14 +60,34 @@ export default function DashboardPage() {
     }
   }, [isLoading])
 
-  const handleCreateToken = async (data: any) => {
+  const handleCreateToken = async (data: {
+    platform: string
+    tokenValue: string
+    purpose: string
+    scopes?: string
+    expiresAt?: string
+    tags?: string
+  }) => {
     const password = prompt('Enter master password to encrypt token:')
     if (!password) throw new Error('Password required')
+    setMasterPassword(password)
+
+    const { encryptedData, iv, authTag, salt } = await encrypt(data.tokenValue, password)
 
     const response = await fetch('/api/tokens', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, password }),
+      body: JSON.stringify({
+        platform: data.platform,
+        encryptedVal: encryptedData,
+        iv,
+        authTag,
+        salt,
+        purpose: data.purpose,
+        scopes: data.scopes,
+        expiresAt: data.expiresAt,
+        tags: data.tags,
+      }),
     })
 
     if (!response.ok) {
@@ -59,18 +99,88 @@ export default function DashboardPage() {
     loadTokens()
   }
 
-  const handleDeleteToken = async (id: string) => {
-    if (!confirm('Are you sure?')) return
-    await fetch(`/api/tokens/${id}`, { method: 'DELETE' })
+  const handleUpdateToken = async (data: {
+    platform: string
+    tokenValue: string
+    purpose: string
+    scopes?: string
+    expiresAt?: string
+    tags?: string
+  }) => {
+    if (!editingToken) return
+
+    const response = await fetch(`/api/tokens/${editingToken.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        platform: data.platform,
+        purpose: data.purpose,
+        scopes: data.scopes,
+        expiresAt: data.expiresAt,
+        tags: data.tags,
+      }),
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to update token')
+    }
+
+    setEditingToken(null)
     loadTokens()
+  }
+
+  const handleDeleteToken = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this token?')) return
+
+    const response = await fetch(`/api/tokens/${id}`, {
+      method: 'DELETE',
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      alert(error.error || 'Failed to delete token')
+      return
+    }
+
+    loadTokens()
+  }
+
+  const handleViewToken = async (token: Token) => {
+    const response = await fetch(`/api/tokens/${token.id}`)
+    const data = await response.json()
+    setViewingToken(data.token)
+  }
+
+  const handleDecryptToken = async (token: Token, password: string): Promise<string> => {
+    if (!token.encryptedVal || !token.iv || !token.authTag || !token.salt) {
+      throw new Error('Token data incomplete')
+    }
+
+    const decrypted = await decrypt(
+      token.encryptedVal,
+      token.iv,
+      token.authTag,
+      token.salt,
+      password
+    )
+
+    return decrypted
   }
 
   const handleLogout = () => {
     localStorage.removeItem('sessionToken')
+    setMasterPassword(null)
     router.push('/login')
   }
 
-  if (isLoading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -79,8 +189,15 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold">1Token</h1>
           <div className="flex gap-2">
             <ThemeToggle />
-            <Button variant="outline" onClick={() => setShowExport(true)}>Export</Button>
-            <Button variant="outline" onClick={handleLogout}>Logout</Button>
+            <Button variant="outline" onClick={() => router.push('/dashboard/audit')}>
+              Audit Log
+            </Button>
+            <Button variant="outline" onClick={() => setShowExport(true)}>
+              Export
+            </Button>
+            <Button variant="outline" onClick={handleLogout}>
+              Lock Vault
+            </Button>
           </div>
         </div>
       </header>
@@ -89,29 +206,58 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-3xl font-bold">Your Tokens</h2>
-            <p className="text-muted-foreground">Manage your API tokens securely</p>
+            <p className="text-muted-foreground">
+              Manage your API tokens securely
+            </p>
           </div>
-          {!showForm && <Button onClick={() => setShowForm(true)}>Add Token</Button>}
+          {!showForm && !editingToken && !viewingToken && (
+            <Button onClick={() => setShowForm(true)}>
+              Add Token
+            </Button>
+          )}
         </div>
 
         {showForm && (
           <div className="max-w-2xl">
-            <TokenForm onSubmit={handleCreateToken} onCancel={() => setShowForm(false)} />
+            <TokenForm
+              onSubmit={handleCreateToken}
+              onCancel={() => setShowForm(false)}
+            />
           </div>
         )}
 
-        {!showForm && (
+        {editingToken && (
+          <div className="max-w-2xl">
+            <TokenForm
+              onSubmit={handleUpdateToken}
+              initialData={editingToken}
+              onCancel={() => setEditingToken(null)}
+            />
+          </div>
+        )}
+
+        {viewingToken && (
+          <div className="max-w-2xl">
+            <TokenView
+              token={viewingToken}
+              onClose={() => setViewingToken(null)}
+              onDecrypt={handleDecryptToken}
+            />
+          </div>
+        )}
+
+        {!showForm && !editingToken && !viewingToken && (
           <TokenList
             tokens={tokens}
-            onEdit={() => {}}
+            onEdit={setEditingToken}
             onDelete={handleDeleteToken}
-            onViewToken={() => {}}
+            onViewToken={handleViewToken}
           />
         )}
 
         {showExport && (
           <ExportDialog
-            tags={[...new Set(tokens.flatMap((t: any) => t.tags.split(',').map((t: string) => t.trim()).filter(Boolean)))].sort()}
+            tags={[...new Set(tokens.flatMap(t => t.tags.split(',').map(tag => tag.trim()).filter(Boolean)))]}
             onClose={() => setShowExport(false)}
           />
         )}
